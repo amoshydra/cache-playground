@@ -1,6 +1,10 @@
 # Cache Playground
 
-A comprehensive HTTP cache testing environment designed to demonstrate and test various cache control headers and behaviors. This playground helps developers understand how different cache headers affect browser and server caching behavior.
+<center>
+<img width="947" height="745" alt="Screenshot of cache playground test page" src="https://github.com/user-attachments/assets/a9b56d3d-faad-4810-a175-3b945625e4dd" />
+</center>
+
+A HTTP cache testing environment designed to demonstrate and test various cache control headers and behaviors. This playground helps developers understand how different cache headers affect browser and server caching behavior.
 
 ## Features
 
