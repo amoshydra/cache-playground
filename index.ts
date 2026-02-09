@@ -1,54 +1,110 @@
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, If-None-Match, If-Modified-Since",
+};
+
+const PORT = Bun.env.PORT || 3000;
 
 const server = Bun.serve({
-  port: 3000,
-  fetch(req) {
+  port: PORT,
+  hostname: "0.0.0.0",
+  async fetch(req) {
     const url = new URL(req.url);
-    const type = url.searchParams.get("type") || url.pathname.slice(1);
+    const path = url.pathname;
 
-    // We'll return the current time so you can see if the response is "fresh"
-    const now = new Date().toLocaleTimeString();
-    const body = `Response generated at: ${now}\nMode: ${type || "default"}`;
+    // --- SERVE THE INDEX.HTML FILE ---
+    if (path === "/") {
+      const file = Bun.file("./index.html"); // Reference the file
 
-    let headers: Record<string, string> = { "Content-Type": "text/plain" };
+      // Check if file exists to prevent server crash
+      if (!(await file.exists())) {
+        return new Response("Documentation file not found", { status: 404 });
+      }
 
-    switch (type) {
-      case "no-store":
-        // 🚫 Never cache. The browser must fetch from server every single time.
-        headers["Cache-Control"] = "no-store";
-        break;
-
-      case "no-cache":
-        // 🔍 Cache allowed, but browser MUST revalidate with server before using.
-        headers["Cache-Control"] = "no-cache";
-        break;
-
-      case "max-age":
-        // ⏱️ Cache for 60 seconds. Browser won't even ask the server for 1 minute.
-        headers["Cache-Control"] = "public, max-age=60";
-        break;
-
-      case "private":
-        // 👤 Only the browser can cache. Intermediate proxies (CDNs) are forbidden.
-        headers["Cache-Control"] = "private, max-age=60";
-        break;
-
-      case "stale":
-        // ⚡ Serve old version while fetching the new one in the background.
-        // Valid for 5s, stale for another 15s.
-        headers["Cache-Control"] = "public, max-age=5, stale-while-revalidate=15";
-        break;
-
-      case "immutable":
-        // 💎 Content will NEVER change. Browser won't revalidate even on page refresh.
-        headers["Cache-Control"] = "public, max-age=31536000, immutable";
-        break;
-
-      default:
-        headers["Cache-Control"] = "no-cache";
+      return new Response(file, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/html",
+        },
+      });
     }
 
-    return new Response(body, { headers });
+
+    if (req.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+
+    // Dynamic content to test if we are getting a "fresh" or "cached" response
+    const content = `Timestamp: ${new Date().toISOString()}\nPath: ${path}`;
+    const etag = `W/"${Bun.hash(content).toString(16)}"`; // Weak ETag
+    const lastModified = "Mon, 01 Jan 2026 00:00:00 GMT";
+
+    // 1. Check for Revalidation (Conditional Requests)
+    const ifNoneMatch = req.headers.get("if-none-match");
+    const ifModifiedSince = req.headers.get("if-modified-since");
+
+    if (ifNoneMatch === etag || ifModifiedSince === lastModified) {
+      console.log(`[304] Revalidated: ${path}`);
+      return new Response(null, { status: 304 });
+    }
+
+    // 2. Define Scenarios
+    const scenarios: Record<string, Record<string, string>> = {
+      "/cache/no-store": {
+        "Cache-Control": "no-store",
+        "X-Note": "Browser must not store this at all."
+      },
+      "/cache/no-cache": {
+        "Cache-Control": "no-cache",
+        "ETag": etag,
+        "X-Note": "Store it, but always revalidate before using."
+      },
+      "/cache/immutable": {
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Note": "Never revalidate, even on refresh."
+      },
+      "/cache/stale-while-revalidate": {
+        "Cache-Control": "public, max-age=5, stale-while-revalidate=15",
+        "X-Note": "Fresh for 5s, served stale for 15s while updating in background."
+      },
+      "/cache/must-revalidate": {
+        "Cache-Control": "public, max-age=10, must-revalidate",
+        "X-Note": "Once stale (after 10s), it MUST NOT use the cache without checking server."
+      },
+      "/cache/private": {
+        "Cache-Control": "private, max-age=60",
+        "X-Note": "Only the end-user browser can cache, not CDNs."
+      },
+      "/cache/vary-ua": {
+        "Cache-Control": "public, max-age=60",
+        "Vary": "User-Agent",
+        "X-Note": "Cache varies based on the browser type."
+      },
+      "/cache/last-modified": {
+        "Cache-Control": "no-cache",
+        "Last-Modified": lastModified,
+        "X-Note": "Testing time-based revalidation."
+      }
+    };
+
+
+    const headers = scenarios[path] || { "Cache-Control": "no-cache" };
+    console.log(`[200] Serving: ${path}`);
+
+    const wait = (duration: number) => new Promise((r) => setTimeout(r, duration));
+
+    await wait(300);
+
+    return new Response(content, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/plain",
+        ...headers,
+      }
+    });
   },
 });
 
-console.log(`🚀 Cache test server running at http://localhost:3000`);
+console.log(`🚀 Comprehensive Cache Lab running at http://localhost:${PORT}`);

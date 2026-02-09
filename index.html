@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cache</title>
+  <style>
+    :root {
+      font-size: 16px;
+    }
+    body {
+      color-scheme: dark;
+      background: black;
+      color: white;
+    }
+    .c-low { color: cyan }
+    .c-med { color: orange }
+    .c-high { color: rgb(255, 133, 253) }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>Cache test</h1>
+    <pre id="output">Loading...</pre>
+
+    <button onclick="location.reload()">Reload</button>
+  </div>
+
+  <script type="module">
+    const wait = (duration) => new Promise((r) => setTimeout(r, duration));
+
+    const outputElement = document.getElementById("output");
+
+    const collect = [];
+    const benchmark = async (path) => {
+      const startTime = performance.now();
+      let r = null;
+      try {
+        r = await fetch(path);
+        await r.text();
+      } catch (e) {
+
+      }
+      const endTime = performance.now();
+      const elapsed = endTime - startTime;
+      collect.push({
+        path,
+        duration: elapsed,
+        status: r?.status,
+      });
+
+      const getColor = (duration) => {
+        if (duration < 60) return "c-low";
+        if (duration < 300) return "c-med";
+        return "c-high";
+      };
+
+      outputElement.innerHTML = collect.map(({ path, duration, status }) => {
+        return `
+          <div style="display:grid;gap:0.125rem;margin-bottom: 1rem">
+            <div><strong>${status}</strong> <code>${path}</code></div>
+            <div class="${getColor(duration)}">${duration} ms</div>
+          </div>`.trim()
+      }).join("");
+      await wait(250);
+    }
+
+    await benchmark("/cache/no-store")
+    await benchmark("/cache/no-cache")
+    await benchmark("/cache/immutable")
+    await benchmark("/cache/stale-while-revalidate")
+    await benchmark("/cache/must-revalidate")
+    await benchmark("/cache/private")
+    await benchmark("/cache/vary-ua")
+    await benchmark("/cache/last-modified")
+  </script>
+</body>
+</html>
