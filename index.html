@@ -16,63 +16,100 @@
     .c-low { color: cyan }
     .c-med { color: orange }
     .c-high { color: rgb(255, 133, 253) }
+    button {
+      font-size: 1rem;
+    }
+    td {
+      padding: 0.5rem;
+      text-align: right;
+    }
+    td button {
+      width: 100px;
+      word-wrap: break-word;
+      font-family: monospace;
+      align-items: left;
+    }
   </style>
 </head>
 <body>
   <div>
-    <h1>Cache test</h1>
-    <pre id="output">Loading...</pre>
+    <div style="display:flex; justify-content:space-between;align-items:center;padding: 0 0.5rem;margin-bottom: 1rem;">
+      <h1>Cache test</h1>
+      <div>
+        <button onclick="location.reload()">Reload</button>
+      </div>
+    </div>
 
-    <button onclick="location.reload()">Reload</button>
+    <table id="table">
+      <thead></thead>
+      <tbody>
+        <tr data-path="/cache/no-store"><td data-btn></td></tr>
+        <tr data-path="/cache/no-cache"><td data-btn></td></tr>
+        <tr data-path="/cache/immutable"><td data-btn></td></tr>
+        <tr data-path="/cache/stale-while-revalidate"><td data-btn></td></tr>
+        <tr data-path="/cache/must-revalidate"><td data-btn></td></tr>
+        <tr data-path="/cache/private"><td data-btn></td></tr>
+        <tr data-path="/cache/vary-ua"><td data-btn></td></tr>
+        <tr data-path="/cache/last-modified"><td data-btn></td></tr>
+        <tr data-path="/error/not-found"><td data-btn></td></tr>
+      </tbody>
+    </table>
+
+
+    <br />
   </div>
 
   <script type="module">
     const wait = (duration) => new Promise((r) => setTimeout(r, duration));
 
     const outputElement = document.getElementById("output");
+    const startButtonElement = document.getElementById("start");
+    const tableElement = document.getElementById("table");
 
-    const collect = [];
-    const benchmark = async (path) => {
+    const benchmark = async (method, path, cb) => {
       const startTime = performance.now();
       let r = null;
       try {
-        r = await fetch(path);
+        r = await fetch(path, { method });
         await r.text();
       } catch (e) {
 
       }
       const endTime = performance.now();
       const elapsed = endTime - startTime;
-      collect.push({
+      const payload = {
         path,
         duration: elapsed,
-        status: r?.status,
-      });
-
-      const getColor = (duration) => {
-        if (duration < 60) return "c-low";
-        if (duration < 300) return "c-med";
-        return "c-high";
+        status: !!r?.ok ? "OK" : "ERR",
       };
 
-      outputElement.innerHTML = collect.map(({ path, duration, status }) => {
-        return `
-          <div style="display:grid;gap:0.125rem;margin-bottom: 1rem">
-            <div><strong>${status}</strong> <code>${path}</code></div>
-            <div class="${getColor(duration)}">${duration} ms</div>
-          </div>`.trim()
-      }).join("");
-      await wait(250);
+      cb(payload);
     }
 
-    await benchmark("/cache/no-store")
-    await benchmark("/cache/no-cache")
-    await benchmark("/cache/immutable")
-    await benchmark("/cache/stale-while-revalidate")
-    await benchmark("/cache/must-revalidate")
-    await benchmark("/cache/private")
-    await benchmark("/cache/vary-ua")
-    await benchmark("/cache/last-modified")
+    // Render
+    const getColor = (duration) => {
+      if (duration < 60) return "c-low";
+      if (duration < 300) return "c-med";
+      return "c-high";
+    };
+
+    const rows = tableElement.querySelectorAll('tr[data-path]');
+    rows.forEach((row) => {
+      const btnContainer = row.querySelector("td[data-btn]");
+      const path = row.dataset.path;
+      const button = document.createElement("button");
+      button.textContent = path.replace(/\//g, " /");
+      button.onclick = () => {
+        benchmark("get", path, ({ duration, status }) => {
+          const td = document.createElement("td");
+          td.insertAdjacentHTML("beforeend", `
+            <span class="${getColor(duration)}">${duration.toFixed(1)}</span>
+          `);
+          row.appendChild(td);
+        })
+      };
+      btnContainer.appendChild(button);
+    });
   </script>
 </body>
 </html>

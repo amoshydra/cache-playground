@@ -91,13 +91,15 @@ const server = Bun.serve({
 
 
     const headers = scenarios[path] || { "Cache-Control": "no-cache" };
-    console.log(`[200] Serving: ${path}`);
+    const status = path.startsWith("/error/") ? 400 : 200;
+    console.log(`[${status}] Serving: ${path}`);
 
     const wait = (duration: number) => new Promise((r) => setTimeout(r, duration));
 
     await wait(300);
 
     return new Response(content, {
+      status,
       headers: {
         ...corsHeaders,
         "Content-Type": "text/plain",
